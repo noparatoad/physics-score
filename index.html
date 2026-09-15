@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบตรวจสอบคะแนนสอบกลางภาค - ภาควิชาฟิสิกส์</title>
+    <!-- Tailwind CSS CDN เพื่อความสวยงามและรองรับมือถือ -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Header & Container -->
+    <div class="container mx-auto px-4 py-8 max-w-lg">
+        
+        <!-- Card หลัก -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+            
+            <!-- ส่วนหัว -->
+            <div class="bg-blue-600 p-6 text-white text-center">
+                <h1 class="text-xl md:text-2xl font-semibold mb-1">ตรวจสอบคะแนนสอบกลางภาค</h1>
+                <p class="text-blue-100 text-sm">รายวิชาปฏิบัติการฟิสิกส์</p>
+                <p class="text-blue-200 text-xs mt-1">ภาคเรียนที่ 1 ปีการศึกษา 2569</p>
+            </div>
+
+            <!-- ฟอร์มค้นหา -->
+            <div class="p-6">
+                <div class="mb-4">
+                    <label for="studentId" class="block text-gray-700 text-sm font-medium mb-2">รหัสนักศึกษา</label>
+                    <div class="relative">
+                        <input type="text" id="studentId" 
+                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg tracking-wider" 
+                            placeholder="กรอกรหัสนักศึกษาแล้วกด Enter" 
+                            autocomplete="off"
+                            onkeypress="handleKeyPress(event)">
+                    </div>
+                </div>
+                
+                <button onclick="searchScore()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition duration-200 shadow-md flex justify-center items-center">
+                    <span id="btnText">ค้นหาคะแนน</span>
+                    <div id="spinner" class="hidden ml-2 border-2 border-white border-t-transparent rounded-full w-5 h-5 animate-spin"></div>
+                </button>
+
+                <!-- พื้นที่แสดงผลลัพธ์ -->
+                <div id="resultArea" class="mt-6 hidden">
+                    <hr class="border-dashed my-4">
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left">
+                        <div class="mb-2"><span class="text-gray-500 text-sm">ชื่อ-นามสกุล:</span> <span id="resName" class="font-semibold text-gray-800"></span></div>
+                        <div class="mb-2"><span class="text-gray-500 text-sm">รหัสนักศึกษา:</span> <span id="resId" class="text-gray-800"></span></div>
+                        <div class="mb-2"><span class="text-gray-500 text-sm">รายวิชา:</span> <span id="resSubject" class="text-gray-800 font-medium"></span></div>
+                        <div class="mb-3"><span class="text-gray-500 text-sm">วันเรียน:</span> <span id="resSection" class="text-gray-800"></span></div>
+                        
+                        <div class="bg-white border-2 border-blue-500 rounded-lg p-3 text-center">
+                            <span class="text-gray-600 text-sm block">คะแนนสอบที่ได้</span>
+                            <span id="resScore" class="text-3xl font-bold text-blue-600">0</span>
+                            <!-- ข้อความสัดส่วนคะแนนที่จะเปลี่ยนไปตามรหัสวิชา -->
+                            <span id="resPercent" class="text-xs text-red-500 block mt-1 font-medium"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แสดงข้อความไม่พบข้อมูล -->
+                <div id="notFound" class="mt-6 hidden bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-center text-sm">
+                    ไม่พบข้อมูลรหัสนักศึกษานี้ กรุณาตรวจสอบความถูกต้องอีกครั้ง
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ส่วนท้าย (ติดต่อภาควิชา) -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-gray-500 text-xs md:text-sm px-4">
+        <p class="font-medium text-gray-700">หากมีข้อสงสัยเกี่ยวกับคะแนนสอบ</p>
+        <p>โปรดติดต่อ: ภาควิชาฟิสิกส์ (ห้องพักอาจารย์ หรือโทร/อีเมลของภาควิชา)</p>
+    </footer>
+
+    <!-- Script การทำงาน -->
+    <script>
+        // นำ URL ที่ได้จาก Google Apps Script (ตอน Deploy) มาใส่ตรงนี้
+        const API_URL = "https://script.google.com/macros/s/AKfycbz_Qqe4_FmJ2HI178hQ15naIYuNrM37st9i0lqcJ49FxlW7zXu3n0gXYuMcsoNq71ChXg/exec"; 
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') {
+                searchScore();
+            }
+        }
+
+        async function searchScore() {
+            const input = document.getElementById('studentId');
+            const studentId = input.value.trim();
+            const resultArea = document.getElementById('resultArea');
+            const notFound = document.getElementById('notFound');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+
+            if (!studentId) {
+                alert("กรุณากรอกรหัสนักศึกษา");
+                return;
+            }
+
+            // จัดการ UI ขณะโหลด
+            resultArea.classList.add('hidden');
+            notFound.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            btnText.innerText = "กำลังค้นหา...";
+
+            try {
+                const response = await fetch(`${API_URL}?studentId=${encodeURIComponent(studentId)}`);
+                const data = await response.json();
+
+                if (data) {
+                    document.getElementById('resId').innerText = data.studentId;
+                    document.getElementById('resName').innerText = data.name;
+                    document.getElementById('resSubject').innerText = data.subject;
+                    document.getElementById('resSection').innerText = data.section;
+                    document.getElementById('resScore').innerText = data.score;
+
+                    // เงื่อนไขคำนวณการแสดงผลตามรหัสวิชา
+                    const subjectStr = String(data.subject);
+                    const percentElement = document.getElementById('resPercent');
+
+                    if (subjectStr.includes("514103") || subjectStr.includes("514111")) {
+                        percentElement.innerText = "* คิดเป็น 16.36% ของคะแนนทั้งหมด";
+                    } else if (subjectStr.includes("514108") || subjectStr.includes("514113")) {
+                        percentElement.innerText = "* คิดเป็น 15% ของคะแนนทั้งหมด";
+                    } else {
+                        // กรณีที่ในตารางเป็นรหัสวิชาอื่น หรือไม่ได้ระบุเปอร์เซ็นต์
+                        percentElement.innerText = "* สัดส่วนคะแนนตามโครงสร้างรายวิชา";
+                    }
+
+                    resultArea.classList.remove('hidden');
+                } else {
+                    notFound.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("เกิดข้อผิดพลาดในการดึงข้อมูล โปรดลองใหม่อีกครั้ง");
+            } finally {
+                spinner.classList.add('hidden');
+                btnText.innerText = "ค้นหาคะแนน";
+            }
+        }
+    </script>
+</body>
+</html>
